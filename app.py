@@ -46,7 +46,7 @@ iface = gr.Interface(
     fn=generate_caption,
     inputs=gr.Image(type="numpy", label="Upload an Image"),
     outputs=gr.Textbox(label="Generated Caption"),
-    title="Image Captioning Using AI - BLTP",
+    title="Image Captioning AI - BLTP",
     description="Upload an image to generate a caption.",
     examples=["test1.jpg", "test2.jpg", "test3.jpg"],
     flagging_mode="never",
