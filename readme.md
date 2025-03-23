@@ -1,4 +1,4 @@
-## Image Captioning and Visual Question Answering AI using Hugging Face models
+## Image Captioning and Visual Question Answering AI using Hugging Face models 🤗
 
 <br>
 
