@@ -1,5 +1,4 @@
 import gradio as gr
-import torch
 import numpy as np
 from transformers import (
     BlipProcessor,
@@ -10,6 +9,7 @@ from PIL import Image
 
 # Load models and processor
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+
 caption_model = BlipForConditionalGeneration.from_pretrained(
     "Salesforce/blip-image-captioning-base"
 )
@@ -22,40 +22,54 @@ def generate_caption(image):
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image).convert("RGB")
         inputs = processor(images=image, return_tensors="pt")
-        outputs = caption_model.generate(
-            **inputs, num_beams=5, max_length=30, early_stopping=True, temperature=0.7
-        )
+        outputs = caption_model.generate(**inputs, temperature=0.7)
         caption = processor.decode(outputs[0], skip_special_tokens=True)
         return (
             image,
             caption,
-            "",
             [],
-        )  # Return image, caption, clear answer, reset history
+        )
     except Exception as e:
-        return None, f"Error: {str(e)}", "", []
+        return None, f"Error: {str(e)}", []
 
 
 # Function to answer question and update history
 def answer_question(image, question, history):
     try:
         if image is None:
-            return "Please upload an image first.", "", history
+            error_message = "⚠️ Please upload an image first before asking questions!"
+            history_text = f"<div style='color: #ef4444; padding: 0.5rem; border-radius: 0.375rem; background-color: #fee2e2'>{error_message}</div>"
+            return (
+                question,
+                history_text,
+            )  # Return original question (don't clear it) and error message
+
         if not question:
-            return "Please enter a question.", "", history
+            return "", history
+
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image).convert("RGB")
+
         inputs = processor(images=image, text=question, return_tensors="pt")
         outputs = vqa_model.generate(
-            **inputs, num_beams=5, max_length=100, early_stopping=True
+            **inputs, num_beams=5, max_length=20, early_stopping=True
         )
         answer = processor.decode(outputs[0], skip_special_tokens=True)
-        # Update history with new Q&A pair
+
+        # Update history with new Q&A pair and styled answer
         history.append((question, answer))
-        history_text = "\n\n".join([f"**Q: {q}**\nA: {a}" for q, a in history])
-        return answer, "", history_text  # Return answer, clear question, update history
+        history_text = "\n\n".join(
+            [
+                f"**Q: {q}**\n<div style='color: #2563eb; margin-left: 1rem; margin-top: 0.5rem'>Answer: {answer}</div>"
+                for q, answer in history
+            ]
+        )
+        return "", history_text  # Clear question input only on successful answer
+
     except Exception as e:
-        return f"Error: {str(e)}", "", history
+        error_message = f"⚠️ Error: {str(e)}"
+        history_text = f"<div style='color: #ef4444; padding: 0.5rem; border-radius: 0.375rem; background-color: #fee2e2'>{error_message}</div>"
+        return question, history_text  # Keep the question in case of error
 
 
 # Custom theme
@@ -70,9 +84,16 @@ custom_theme = gr.themes.Soft(
 
 # Gradio interface
 with gr.Blocks(theme=custom_theme, title="Image Captioning & VQA AI - BLIP") as iface:
-    gr.Markdown("## Image Captioning & VQA AI - BLIP")
     gr.Markdown(
-        "Upload an image to get a caption, then ask questions and see the history!"
+        """
+        <div style="text-align: center">
+            <h2>Image Captioning & VQA AI - BLIP</h2>
+            <br>
+        </div>
+        """
+    )
+    gr.Markdown(
+        " Upload an image to get a caption, then ask questions and see the history!"
     )
 
     # States for image and history
@@ -83,24 +104,27 @@ with gr.Blocks(theme=custom_theme, title="Image Captioning & VQA AI - BLIP") as 
         # Image input
         with gr.Column():
             image_input = gr.Image(type="numpy", label="Upload an Image")
+            caption_btn = gr.Button("Generate Caption")
 
         # captions Question input and answer output
         with gr.Column():
-            caption_btn = gr.Button("Generate Caption")
-            caption_output = gr.Textbox(placeholder="Caption will appear here...")
+            caption_output = gr.Textbox(
+                label="Image Caption", placeholder="Caption will appear here..."
+            )
 
-            with gr.Row():
-                question_input = gr.Textbox(
-                    label="Ask a Question", placeholder="e.g., What color is the dog?"
-                )
-                question_btn = gr.Button("Get Answer")
+            gr.Markdown("### Ask questions about the image")
 
-                answer_output = gr.Textbox(placeholder="Answer will appear here...")
+            question_input = gr.Textbox(
+                label="Ask a Question", placeholder="e.g., What color is the dog?"
+            )
+            question_btn = gr.Button("Get Answer")
 
-                # History display
-                history_output = gr.Markdown(
-                    label="Question & Answer History", value="No questions asked yet."
-                )
+            # answer_output = gr.Text(show_label=False)
+
+            # History display
+            history_output = gr.Markdown(
+                label="Question & Answer History", value="No questions asked yet."
+            )
 
     # Examples
     gr.Examples(
@@ -119,19 +143,17 @@ with gr.Blocks(theme=custom_theme, title="Image Captioning & VQA AI - BLIP") as 
         outputs=[
             image_state,
             caption_output,
-            answer_output,
             history_state,
-        ],  # Store image, show caption, clear answer, reset history
+        ],
     )
     question_btn.click(
         fn=answer_question,
         inputs=[image_state, question_input, history_state],
         outputs=[
-            answer_output,
             question_input,
             history_output,
-        ],  # Show answer, clear question, update history
+        ],
     )
 
 # Launch the interface
-iface.launch(share=True)
+iface.launch()
