@@ -19,6 +19,8 @@ vqa_model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
 # Function to generate caption and initialize history
 def generate_caption(image):
     try:
+        if image is None:
+            return None, "⚠️ Please upload an image first before asking questions!", []
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image).convert("RGB")
         inputs = processor(images=image, return_tensors="pt")
@@ -87,14 +89,12 @@ with gr.Blocks(theme=custom_theme, title="Image Captioning & VQA AI - BLIP") as 
     gr.Markdown(
         """
         <div style="text-align: center">
-            <h2>Image Captioning & VQA AI - BLIP</h2>
+            <h2>Image Captioning & Question Answering AI - BLIP</h2>
             <br>
         </div>
         """
     )
-    gr.Markdown(
-        " Upload an image to get a caption, then ask questions and see the history!"
-    )
+    gr.Markdown(" Upload an image to get a caption then ask questions about the image.")
 
     # States for image and history
     image_state = gr.State()
@@ -109,7 +109,7 @@ with gr.Blocks(theme=custom_theme, title="Image Captioning & VQA AI - BLIP") as 
         # captions Question input and answer output
         with gr.Column():
             caption_output = gr.Textbox(
-                label="Image Caption", placeholder="Caption will appear here..."
+                label="Image Description", placeholder="Caption will appear here..."
             )
 
             gr.Markdown("### Ask questions about the image")
